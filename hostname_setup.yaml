@@ -1,0 +1,27 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+   - name: Getting an ip of a machine
+     shell: ifconfig eth0 | grep inet | head -1 | awk -F " " '{print $2}' | awk -F "." '{print $3,$4}' | sed "s/ /-/g"
+     register: ip
+  
+   - debug: var=ip
+
+   - name: Setting a hostname 
+     command: hostname pavithra-test01-"{{ip.stdout}}"
+     register: new_name
+   - debug: var=new_name
+
+   - name: Adding hostname entry into /etc/hostname file
+     shell: echo "pavithra-test01-{{ip.stdout}}" > /etc/hostname
+   
+   - name: Getting full ip of machine
+     shell: ifconfig eth0 | grep inet | head -1 | awk -F " " '{print $2}' 
+     register: fullip
+
+   - name: Adding hostname entry into /etc/host file
+     lineinfile: 
+       path: /etc/hosts
+       line: "{{fullip.stdout}}  pavithra-test01-{{ip.stdout}}"
+       
