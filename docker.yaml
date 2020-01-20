@@ -1,0 +1,26 @@
+---
+- hosts: all
+  become: true
+
+  tasks:
+    - name: Install curl
+      apt: name=curl state=latest
+
+    - name: Add GPG key to docker repo
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+    
+    - name: Add docker repo to apt
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+        state: present
+    
+    - name: Update packages
+      apt: update_cache=yes 
+    
+    - name: Docker Installation
+      apt: name=docker-ce state=latest
+   
+    - name: Docker test
+      command: docker --version
