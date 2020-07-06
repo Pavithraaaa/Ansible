@@ -1,0 +1,10 @@
+---
+AccessKey: ""
+SecretKey: ""
+aws_region: ap-south-1
+aws_zone: ap-south-1b
+instance_type: t2.micro
+ami: ami-03b8a287edc0c1253
+pem_key: ec2-login
+user: ubuntu
+env : dev

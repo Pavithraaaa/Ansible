@@ -1,0 +1,92 @@
+---
+    - name: Create security group
+      ec2_group:
+        name: "demo_security_group"
+        description: "demo security group"
+        region: "{{ aws_region }}"
+        rules:
+          - proto: tcp  # ssh
+            from_port: 22
+            to_port: 22
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp  # http
+            from_port: 80
+            to_port: 80
+            cidr_ip: 0.0.0.0/0
+          - proto: tcp  # https
+            from_port: 443
+            to_port: 443
+            cidr_ip: 0.0.0.0/0
+        rules_egress:
+          - proto: all
+            cidr_ip: 0.0.0.0/0
+      register: demo_firewall
+
+    - name: Create an EC2 instance
+      ec2:
+        key_name: "{{ pem_key }}"
+        region: "{{ aws_region }}"
+        
+        group_id: "{{ demo_firewall.group_id }}"
+        instance_type: "{{ instance_type }}"
+        image: "{{ ami }}"
+        wait: yes
+        instance_tags:
+            env: "{{ env }}"
+        count_tag: env
+        exact_count: 2
+        vpc_subnet_id: subnet-315e377d
+        assign_public_ip: yes
+      register: ec2
+    - debug: var=ec2
+
+    - name: wait for the servers to appear on the network
+      wait_for: host={{ ec2.tagged_instances[0].public_dns_name }} port=22 delay=10 timeout=180 state=started
+    
+
+    - name: add server ip addresses to hosts group
+      add_host: hostname={{ item }} groupname=launched
+      with_items: 
+        - ec2.tagged_instances[0].public_ip
+        - ec2.tagged_instances[1].public_ip
+
+    
+#- name: webservers (installs nginx ...)
+  #hosts: launched
+  #remote_user: ubuntu
+  #become: true
+  #become_method: sudo
+  #gather_facts: True
+  #roles:
+    #- web
+
+    - name: setup a simple load balancer
+      ec2_elb_lb:
+        name: aws-elb-demo
+        state: present
+        region: "{{ aws_region }}"
+        zones:
+          - "{{ aws_zone }}"
+        listeners:
+          - protocol: http
+            load_balancer_port: 80
+            instance_port: 80
+      register: elb
+    - debug: var=elb
+
+    - name: add the webservers to the load balancer
+      local_action: ec2_elb
+      args:
+        instance_id: "{{ item }}"
+        ec2_elbs: aws-elb-demo
+        state: present
+        region: "{{ aws_region }}"
+      with_items: 
+        - ec2.tagged_instances[0].id
+        - ec2.tagged_instances[1].id
+      until: ec2_elb_result | success
+      retries: 10
+      delay: 30
+
+
+
